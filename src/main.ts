@@ -15,10 +15,29 @@ async function bootstrap(): Promise<void> {
 
   app.setGlobalPrefix('api/v1');
 
-  app.enableCors({
-    origin: '*',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  const allowedOrigins = configService
+    .get<string>('ALLOWED_ORIGINS', 'http://localhost:3000,http://localhost:5173')
+    .split(',')
+    .map((o) => o.trim());
+    
+ app.enableCors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, Postman, curl, server-to-server)
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin '${origin}' is not allowed`));
+      }
+    },
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-paystack-signature'],
+    exposedHeaders: ['Content-Disposition'],
     credentials: true,
+    maxAge: 86400, // Cache preflight response for 24 hours
   });
 
   app.useGlobalPipes(
