@@ -33,7 +33,7 @@ export class SchoolsController {
   constructor(private readonly schoolsService: SchoolsService) {}
 
   @ApiOperation({ summary: 'Register a new school (super admin only)' })
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Post()
   create(@Body() dto: CreateSchoolDto) {
     return this.schoolsService.create(dto);
