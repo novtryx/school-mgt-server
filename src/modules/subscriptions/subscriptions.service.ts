@@ -151,12 +151,41 @@ export class SubscriptionsService {
   }
 
   /**
+   * Automatically assign the Free plan to a newly registered school.
+   * Called internally during registration — never expires.
+   */
+  async assignFreePlanToSchool(schoolId: string): Promise<void> {
+    const freePlan = await this.plansRepository.findOne({
+      where: { slug: 'free' },
+    });
+
+    if (!freePlan) {
+      this.logger.warn(
+        `Free plan not found in DB — school ${schoolId} was not assigned a plan`,
+      );
+      return;
+    }
+
+    const subscription = this.subscriptionsRepository.create({
+      schoolId,
+      planId: freePlan.id,
+      status: SubscriptionStatus.ACTIVE,
+      amountPaidKobo: 0,
+      startsAt: new Date(),
+      expiresAt: undefined,
+    });
+
+    await this.subscriptionsRepository.save(subscription);
+  }
+
+  /**
    * Activate a free plan (priceKobo = 0) without going through Paystack.
+   * Free plan is permanent — no expiry date is set.
    */
   async activateFreePlan(dto: InitiateSubscriptionDto): Promise<Subscription> {
     const plan = await this.findPlanById(dto.planId);
 
-    if (plan.priceKobo !== 0) {
+    if (Number(plan.priceKobo) !== 0) {
       throw new BadRequestException('This plan requires payment. Use the initiate endpoint.');
     }
 
@@ -168,7 +197,7 @@ export class SubscriptionsService {
       status: SubscriptionStatus.ACTIVE,
       amountPaidKobo: 0,
       startsAt: new Date(),
-      expiresAt: this.calculateExpiry(plan.billingCycle),
+      expiresAt: undefined, // Free plan never expires
     });
 
     return this.subscriptionsRepository.save(subscription);
@@ -225,15 +254,15 @@ export class SubscriptionsService {
     const subscription = await this.getActiveSubscription(schoolId);
 
     if (!subscription) {
-      // Default to Starter limits if no active subscription
-      const starterPlan = await this.plansRepository.findOne({
-        where: { slug: 'starter' },
+      // Fall back to Free plan limits if no active subscription exists
+      const freePlan = await this.plansRepository.findOne({
+        where: { slug: 'free' },
       });
       return {
-        studentLimit: starterPlan?.studentLimit ?? 150,
-        staffLimit: starterPlan?.staffLimit ?? null,
-        name: starterPlan?.name ?? 'Starter',
-        planId: starterPlan?.id ?? null,
+        studentLimit: freePlan?.studentLimit ?? 3,
+        staffLimit: freePlan?.staffLimit ?? 1,
+        name: freePlan?.name ?? 'Free',
+        planId: freePlan?.id ?? null,
       };
     }
 

@@ -7,13 +7,14 @@ import * as crypto from 'crypto';
 import { UsersService } from '../users/users.service';
 import { SchoolsService } from '../schools/schools.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
-import { AcceptInviteDto } from '../users/dto/accept-invite.dto';
+import { AcceptInviteDto } from '../users/dto/accept-invite.dto'; 
 import { User, UserRole } from '../users/entities/user.entity';
 import {
   InvalidCredentialsException,
@@ -39,6 +40,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly schoolsService: SchoolsService,
     private readonly notificationsService: NotificationsService,
+    private readonly subscriptionsService: SubscriptionsService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly dataSource: DataSource,
@@ -46,6 +48,7 @@ export class AuthService {
 
   /**
    * Register a new school and its admin user in a single transaction.
+   * Automatically assigns the Free plan on registration.
    * Sends a verification email after creation.
    */
   async register(dto: RegisterDto): Promise<AuthResult> {
@@ -78,7 +81,12 @@ export class AuthService {
 
       await queryRunner.commitTransaction();
 
-      // Send verification email — non-blocking, don't fail registration if this errors
+      // Auto-assign Free plan — non-blocking, failure does not break registration
+      this.subscriptionsService
+        .assignFreePlanToSchool(school.id)
+        .catch(() => null);
+
+      // Send verification email — non-blocking
       this.notificationsService
         .sendEmailVerification(user.email, user.firstName, verificationToken)
         .catch(() => null);
