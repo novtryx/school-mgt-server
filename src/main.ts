@@ -19,8 +19,8 @@ async function bootstrap(): Promise<void> {
     .get<string>('ALLOWED_ORIGINS', 'http://localhost:3000,http://localhost:5173')
     .split(',')
     .map((o) => o.trim());
-    
- app.enableCors({
+
+  app.enableCors({
     origin: (origin, callback) => {
       // Allow requests with no origin (mobile apps, Postman, curl, server-to-server)
       if (!origin) {
@@ -82,7 +82,13 @@ async function bootstrap(): Promise<void> {
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document);
+  SwaggerModule.setup('api/docs', app, document, {
+    customCssUrl: 'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui.min.css',
+    customJs: [
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-bundle.min.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-standalone-preset.min.js',
+    ],
+  });
 
   const port = configService.get<number>('PORT', 3000);
   await app.listen(port);
