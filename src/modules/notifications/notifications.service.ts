@@ -47,6 +47,42 @@ export class NotificationsService {
   }
 
   /**
+   * Send a staff invite email with a link to set their password.
+   */
+  async sendStaffInvite(
+    email: string,
+    firstName: string,
+    schoolName: string,
+    role: string,
+    token: string,
+  ): Promise<void> {
+    const inviteUrl = `${this.appUrl}/accept-invite?token=${token}`;
+
+    await this.send({
+      to: email,
+      subject: `You have been invited to join ${schoolName} on ReportRun`,
+      html: `
+        <p>Hi ${firstName},</p>
+        <p>
+          You have been added to <strong>${schoolName}</strong> on ReportRun
+          as a <strong>${role}</strong>.
+        </p>
+        <p>Click the button below to set your password and activate your account:</p>
+        <p style="margin:24px 0;">
+          <a href="${inviteUrl}"
+             style="background:#1a1a1a;color:#fff;padding:12px 24px;text-decoration:none;border-radius:4px;font-weight:bold;">
+            Accept Invite
+          </a>
+        </p>
+        <p>Or copy this link into your browser:</p>
+        <p style="color:#555;">${inviteUrl}</p>
+        <p>This invite link expires in <strong>72 hours</strong>.</p>
+        <p>If you were not expecting this invite, you can safely ignore this email.</p>
+      `,
+    });
+  }
+
+  /**
    * Send a password reset link. The raw token (not hashed) is embedded in the URL.
    */
   async sendPasswordReset(

@@ -2,13 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
-import { User, AuthProvider } from './entities/user.entity';
+import * as crypto from 'crypto';
+import { User, AuthProvider, InviteStatus } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { InviteUserDto } from './dto/invite-user.dto';
 import {
   ResourceNotFoundException,
   DuplicateResourceException,
 } from '../../common/exceptions/app.exceptions';
+import { BadRequestException } from '@nestjs/common';
 
 @Injectable()
 export class UsersService {
@@ -61,10 +64,22 @@ export class UsersService {
   }
 
   /**
+   * Find a user by their invite token.
+   */
+  async findByInviteToken(token: string): Promise<User | null> {
+    return this.usersRepository.findOne({
+      where: { inviteToken: token },
+    });
+  }
+
+  /**
    * Find all users belonging to a school.
    */
   async findAllBySchool(schoolId: string): Promise<User[]> {
-    return this.usersRepository.find({ where: { schoolId } });
+    return this.usersRepository.find({
+      where: { schoolId },
+      order: { createdAt: 'DESC' },
+    });
   }
 
   /**
@@ -120,6 +135,96 @@ export class UsersService {
   }
 
   /**
+   * Create a staff account in pending invite state.
+   * No password is set — the user sets it when they accept the invite.
+   * Returns the raw invite token (not hashed) for embedding in the email.
+   */
+  async createInvitedUser(
+    dto: InviteUserDto,
+  ): Promise<{ user: User; rawToken: string }> {
+    const existing = await this.findByEmail(dto.email);
+    if (existing) {
+      throw new DuplicateResourceException('User', 'email');
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 72 * 60 * 60 * 1000); // 72 hours
+
+    const user = this.usersRepository.create({
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      email: dto.email,
+      role: dto.role,
+      phoneNumber: dto.phoneNumber,
+      schoolId: dto.schoolId,
+      inviteToken: rawToken,
+      inviteExpires: expires,
+      inviteStatus: InviteStatus.PENDING,
+      isEmailVerified: false,
+      isActive: false, // Not active until invite is accepted
+    });
+
+    const saved = await this.usersRepository.save(user);
+    return { user: saved, rawToken };
+  }
+
+  /**
+   * Accept an invite — set the user's password, mark them active and verified.
+   */
+  async acceptInvite(token: string, password: string): Promise<User> {
+    const user = await this.findByInviteToken(token);
+
+    if (!user) {
+      throw new BadRequestException('Invalid or already used invite link');
+    }
+
+    if (!user.inviteExpires || user.inviteExpires < new Date()) {
+      throw new BadRequestException(
+        'This invite link has expired. Ask your administrator to resend the invite.',
+      );
+    }
+
+    if (user.inviteStatus === InviteStatus.ACCEPTED) {
+      throw new BadRequestException(
+        'This invite has already been accepted. Please log in instead.',
+      );
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    user.password = hashedPassword;
+    user.inviteStatus = InviteStatus.ACCEPTED;
+    user.inviteToken = undefined;
+    user.inviteExpires = undefined;
+    user.isActive = true;
+    user.isEmailVerified = true;
+
+    return this.usersRepository.save(user);
+  }
+
+  /**
+   * Resend an invite to a pending user with a fresh token and expiry.
+   * Returns the new raw token for the email.
+   */
+  async resendInvite(userId: string): Promise<{ user: User; rawToken: string }> {
+    const user = await this.findById(userId);
+
+    if (user.inviteStatus === InviteStatus.ACCEPTED) {
+      throw new BadRequestException('This user has already accepted their invite');
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 72 * 60 * 60 * 1000);
+
+    user.inviteToken = rawToken;
+    user.inviteExpires = expires;
+    user.inviteStatus = InviteStatus.PENDING;
+
+    const saved = await this.usersRepository.save(user);
+    return { user: saved, rawToken };
+  }
+
+  /**
    * Create or update a user from a Google OAuth profile.
    */
   async findOrCreateFromGoogle(profile: {
@@ -139,6 +244,8 @@ export class UsersService {
       user.googleId = profile.googleId;
       user.authProvider = AuthProvider.GOOGLE;
       user.isEmailVerified = true;
+      user.isActive = true;
+      user.inviteStatus = InviteStatus.ACCEPTED;
       if (profile.avatarUrl) {
         user.avatarUrl = profile.avatarUrl;
       }
@@ -149,6 +256,7 @@ export class UsersService {
       ...profile,
       authProvider: AuthProvider.GOOGLE,
       isEmailVerified: true,
+      isActive: true,
     });
 
     return this.usersRepository.save(newUser);

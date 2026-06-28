@@ -16,7 +16,7 @@ async function bootstrap(): Promise<void> {
   app.setGlobalPrefix('api/v1');
 
   const allowedOrigins = configService
-    .get<string>('ALLOWED_ORIGINS', 'http://localhost:3000,http://localhost:5173')
+    .get<string>('ALLOWED_ORIGINS', 'http://localhost:3000,http://localhost:5173,https://report-run.vercel.app')
     .split(',')
     .map((o) => o.trim());
 

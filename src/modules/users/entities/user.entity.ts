@@ -25,6 +25,11 @@ export enum AuthProvider {
   GOOGLE = 'google',
 }
 
+export enum InviteStatus {
+  PENDING = 'pending',
+  ACCEPTED = 'accepted',
+}
+
 @Entity('users')
 export class User {
   @ApiProperty({ example: 'uuid-v4' })
@@ -81,12 +86,33 @@ export class User {
   @Column({ name: 'phone_number', nullable: true })
   phoneNumber?: string;
 
-  // Refresh token — hashed before storage
+  // ─── Invite ─────────────────────────────────────────────────────────────────
+
+  @ApiPropertyOptional({ enum: InviteStatus })
+  @Column({
+    name: 'invite_status',
+    type: 'enum',
+    enum: InviteStatus,
+    nullable: true,
+  })
+  inviteStatus?: InviteStatus;
+
+  @Exclude()
+  @Column({ name: 'invite_token', nullable: true })
+  inviteToken?: string;
+
+  @Exclude()
+  @Column({ name: 'invite_expires', nullable: true, type: 'timestamptz' })
+  inviteExpires?: Date;
+
+  // ─── Refresh token ───────────────────────────────────────────────────────────
+
   @Exclude()
   @Column({ name: 'refresh_token', nullable: true })
   refreshToken?: string;
 
-  // Password reset
+  // ─── Password reset ──────────────────────────────────────────────────────────
+
   @Exclude()
   @Column({ name: 'password_reset_token', nullable: true })
   passwordResetToken?: string;
@@ -95,10 +121,13 @@ export class User {
   @Column({ name: 'password_reset_expires', nullable: true, type: 'timestamptz' })
   passwordResetExpires?: Date;
 
-  // Email verification
+  // ─── Email verification ──────────────────────────────────────────────────────
+
   @Exclude()
   @Column({ name: 'email_verification_token', nullable: true })
   emailVerificationToken?: string;
+
+  // ─── Relations ───────────────────────────────────────────────────────────────
 
   @ApiPropertyOptional()
   @Index()

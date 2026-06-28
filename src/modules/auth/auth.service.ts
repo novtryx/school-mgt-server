@@ -13,6 +13,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { AcceptInviteDto } from '../users/dto/accept-invite.dto';
 import { User, UserRole } from '../users/entities/user.entity';
 import {
   InvalidCredentialsException,
@@ -89,6 +90,14 @@ export class AuthService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  /**
+   * Accept a staff invite — set password and activate the account.
+   */
+  async acceptInvite(dto: AcceptInviteDto): Promise<AuthResult> {
+    const user = await this.usersService.acceptInvite(dto.token, dto.password);
+    return this.buildAuthResult(user);
   }
 
   /**
