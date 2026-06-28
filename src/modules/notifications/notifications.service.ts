@@ -9,7 +9,11 @@ export class NotificationsService {
   private readonly transporter: nodemailer.Transporter;
   private readonly appUrl: string;
 
+  
   constructor(private readonly configService: ConfigService) {
+
+   
+
     this.transporter = nodemailer.createTransport({
       host: this.configService.get<string>('MAIL_HOST'),
       port: this.configService.get<number>('MAIL_PORT'),
