@@ -19,6 +19,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { AcceptInviteDto } from '../users/dto/accept-invite.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User } from '../users/entities/user.entity';
@@ -85,6 +86,13 @@ export class AuthController {
     @Body() dto: ChangePasswordDto,
   ): Promise<{ message: string }> {
     return this.authService.changePassword(user.id, dto);
+  }
+
+  @ApiOperation({ summary: 'Accept a staff invite and set password' })
+  @HttpCode(HttpStatus.OK)
+  @Post('accept-invite')
+  acceptInvite(@Body() dto: AcceptInviteDto): Promise<AuthResult> {
+    return this.authService.acceptInvite(dto);
   }
 
   @ApiOperation({ summary: 'Verify email address using the token from the registration email' })
