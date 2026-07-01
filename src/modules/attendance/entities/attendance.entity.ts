@@ -15,12 +15,20 @@ import { ClassSection } from '../../classes/entities/class.entity';
 
 export enum AttendanceStatus {
   PRESENT = 'present',
-  ABSENT = 'absent',
-  LATE = 'late',
+  ABSENT  = 'absent',
+  LATE    = 'late',
 }
 
+export enum AttendanceSession {
+  MORNING   = 'morning',
+  AFTERNOON = 'afternoon',
+}
+
+// Morning registration closes at this hour (11:00 WAT)
+export const MORNING_CLOSE_HOUR = 11;
+
 @Entity('attendance')
-@Unique(['studentId', 'classId', 'date'])
+@Unique(['studentId', 'classId', 'date', 'session'])
 export class Attendance {
   @ApiProperty()
   @PrimaryGeneratedColumn('uuid')
@@ -45,8 +53,12 @@ export class Attendance {
   class!: ClassSection;
 
   @ApiProperty({ enum: AttendanceStatus })
-  @Column({ type: 'enum', enum: AttendanceStatus, default: AttendanceStatus.PRESENT })
+  @Column({ type: 'enum', enum: AttendanceStatus, default: AttendanceStatus.ABSENT })
   status!: AttendanceStatus;
+
+  @ApiProperty({ enum: AttendanceSession })
+  @Column({ type: 'enum', enum: AttendanceSession, default: AttendanceSession.MORNING })
+  session!: AttendanceSession;
 
   @ApiProperty({ example: '2024-09-15', description: 'Date string YYYY-MM-DD' })
   @Index()

@@ -10,6 +10,13 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { FeeInvoice } from './fee-invoice.entity';
 
+export enum PaymentMethod {
+  CASH          = 'cash',
+  BANK_TRANSFER = 'bank_transfer',
+  POS           = 'pos',
+  PAYSTACK      = 'paystack',
+}
+
 @Entity('payments')
 export class Payment {
   @ApiProperty()
@@ -29,31 +36,36 @@ export class Payment {
   @JoinColumn({ name: 'invoice_id' })
   invoice!: FeeInvoice;
 
-  @ApiProperty({ description: 'Amount paid in this transaction' })
+  @ApiProperty({ description: 'Actual amount paid in this transaction (not percentage)' })
   @Column({ name: 'amount', type: 'decimal', precision: 12, scale: 2 })
   amount!: number;
 
-  @ApiProperty({ description: 'Percentage of total this payment represents' })
-  @Column({ name: 'percentage_paid', type: 'decimal', precision: 5, scale: 2 })
-  percentagePaid!: number;
-
-  @ApiProperty({ description: 'Balance remaining after this payment' })
+  @ApiProperty({ description: 'Balance remaining on the invoice after this payment' })
   @Column({ name: 'balance_after', type: 'decimal', precision: 12, scale: 2 })
   balanceAfter!: number;
 
-  @ApiPropertyOptional({ example: 'cash' })
-  @Column({ name: 'payment_method', nullable: true })
-  paymentMethod?: string;
+  @ApiProperty({ enum: PaymentMethod, default: PaymentMethod.CASH })
+  @Column({
+    name: 'payment_method',
+    type: 'enum',
+    enum: PaymentMethod,
+    default: PaymentMethod.CASH,
+  })
+  paymentMethod!: PaymentMethod;
 
-  @ApiPropertyOptional({ description: 'External payment reference or transaction ID' })
+  @ApiPropertyOptional({ description: 'Teller number, Paystack reference, or bank ref' })
   @Column({ name: 'reference', nullable: true })
   reference?: string;
 
-  @ApiPropertyOptional({ description: 'Staff member who recorded this payment' })
+  @ApiPropertyOptional({ description: 'Paystack transaction ID — only for online payments' })
+  @Column({ name: 'paystack_transaction_id', nullable: true })
+  paystackTransactionId?: string;
+
+  @ApiPropertyOptional({ description: 'User ID of staff who recorded this payment' })
   @Column({ name: 'recorded_by', nullable: true })
   recordedBy?: string;
 
-  @ApiPropertyOptional({ description: 'Optional note from the bursar' })
+  @ApiPropertyOptional()
   @Column({ name: 'note', nullable: true, type: 'text' })
   note?: string;
 

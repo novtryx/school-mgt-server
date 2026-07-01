@@ -2,8 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { Report, ReportStatus } from './entities/report.entity';
-import { Score } from '../scores/entities/score.entity';
-import { GenerateReportsDto } from './dto/generate-reports.dto';
+import { Score } from '../scores/entities/score.entity';import { GenerateReportsDto } from './dto/generate-reports.dto';
 import { UpdateReportDto } from './dto/update-report.dto';
 import { ResourceNotFoundException } from '../../common/exceptions/app.exceptions';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -168,5 +167,77 @@ export class ReportsService {
       throw new ResourceNotFoundException('Report', id);
     }
     return report;
+  }
+
+  /**
+   * Get a full report card data package for a single student report.
+   * Returns everything the printable report card needs in one call:
+   * - Report with student, class, teacher comment, traits
+   * - All scores with subject names, CA, exam, total, grade
+   * - Class statistics: size, highest average, lowest average, class average
+   */
+  async findFull(id: string): Promise<{
+    report:          Report;
+    scores:          Score[];
+    classSize:       number;
+    classHighest:    number;
+    classLowest:     number;
+    classAverage:    number;
+    totalObtained:   number;
+    totalObtainable: number;
+  }> {
+    const report = await this.reportsRepository.findOne({
+      where:     { id },
+      relations: { student: true, class: true },
+    });
+    if (!report) throw new ResourceNotFoundException('Report', id);
+
+    // All scores for this student in this term
+    const scores = await this.scoresRepository.find({
+      where: {
+        studentId:    report.studentId,
+        term:         report.term,
+        academicYear: report.academicYear,
+      },
+      relations: { subject: true },
+      order:     { subject: { name: 'ASC' } },
+    });
+
+    // Class-level stats from all reports in the same class/term
+    const classReports = await this.reportsRepository.find({
+      where: {
+        classId:      report.classId,
+        term:         report.term,
+        academicYear: report.academicYear,
+      },
+    });
+
+    const averages     = classReports.map((r) => Number(r.average));
+    const classSize    = classReports.length;
+    const classHighest = classSize ? Math.max(...averages) : 0;
+    const classLowest  = classSize ? Math.min(...averages) : 0;
+    const classAverage = classSize
+      ? averages.reduce((a, b) => a + b, 0) / classSize
+      : 0;
+
+    const totalObtained   = scores.reduce((sum, s) => sum + Number(s.totalScore), 0);
+    const totalObtainable = scores.reduce(
+      (sum, s) =>
+        sum +
+        ((s.subject as any)?.maxCaScore   ?? 40) +
+        ((s.subject as any)?.maxExamScore ?? 60),
+      0,
+    );
+
+    return {
+      report,
+      scores,
+      classSize,
+      classHighest:    Math.round(classHighest    * 100) / 100,
+      classLowest:     Math.round(classLowest     * 100) / 100,
+      classAverage:    Math.round(classAverage    * 100) / 100,
+      totalObtained:   Math.round(totalObtained),
+      totalObtainable: Math.round(totalObtainable),
+    };
   }
 }

@@ -51,7 +51,7 @@ export class ReportsController {
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.TEACHER)
   @Post('publish')
   publish(
-    @Query('classId', ParseUUIDPipe) classId: string,
+    @Query('classId') classId: string,
     @Query('term') term: string,
     @Query('academicYear') academicYear: string,
   ) {
@@ -64,18 +64,25 @@ export class ReportsController {
   @ApiQuery({ name: 'academicYear', type: String })
   @Get()
   findByClass(
-    @Query('classId', ParseUUIDPipe) classId: string,
+    @Query('classId') classId: string,
     @Query('term') term: string,
     @Query('academicYear') academicYear: string,
   ) {
     return this.reportsService.findByClass(classId, term, academicYear);
   }
 
-  @ApiOperation({ summary: 'Get a single report by ID' })
-  @Get(':id')
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.reportsService.findById(id);
+  @ApiOperation({
+    summary: 'Get full report card data for printing',
+    description:
+      'Returns the report, all scores with subject details, and class statistics ' +
+      'in a single response — everything needed to render the printable report card.',
+  })
+  @Get(':id/full')
+  findFull(@Param('id') id: string) {
+    return this.reportsService.findFull(id);
   }
+
+
 
   @ApiOperation({
     summary: 'Update form teacher comment and character trait ratings',
@@ -83,12 +90,19 @@ export class ReportsController {
       'Accessible from the Form Teacher Terminal. Adds teacher narrative, ' +
       'conduct, punctuality, and neatness ratings (1–5 scale).',
   })
+  
   @Roles(UserRole.TEACHER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Patch(':id/teacher-input')
   updateByFormTeacher(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() dto: UpdateReportDto,
   ) {
     return this.reportsService.updateByFormTeacher(id, dto);
+  }
+
+  @ApiOperation({ summary: 'Get a single report by ID' })
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.reportsService.findById(id);
   }
 }

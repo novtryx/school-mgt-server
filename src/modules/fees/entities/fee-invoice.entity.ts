@@ -5,18 +5,18 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
-  OneToMany,
   JoinColumn,
   Index,
 } from 'typeorm';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Student } from '../../students/entities/student.entity';
 import { School } from '../../schools/entities/school.entity';
+import { FeeTemplate } from './fee-template.entity';
 
 export enum PaymentStatus {
-  DEFAULTER = 'defaulter',
+  DEFAULTER      = 'defaulter',
   PARTIALLY_PAID = 'partially_paid',
-  PAID = 'paid',
+  PAID           = 'paid',
 }
 
 @Entity('fee_invoices')
@@ -43,32 +43,28 @@ export class FeeInvoice {
   @JoinColumn({ name: 'school_id' })
   school!: School;
 
+  @ApiPropertyOptional({ description: 'The template this invoice was generated from' })
+  @Column({ name: 'template_id', nullable: true })
+  templateId?: string;
+
+  @ManyToOne(() => FeeTemplate, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'template_id' })
+  template?: FeeTemplate;
+
   @ApiProperty({ example: 'First Term 2024/2025' })
   @Column({ name: 'term_label' })
   termLabel!: string;
 
-  @ApiProperty({ description: 'Total amount due in the school currency', example: 150000 })
+  @ApiProperty()
   @Column({ name: 'total_amount', type: 'decimal', precision: 12, scale: 2 })
   totalAmount!: number;
 
-  @ApiProperty({ description: 'Amount paid so far', example: 60000 })
-  @Column({
-    name: 'amount_paid',
-    type: 'decimal',
-    precision: 12,
-    scale: 2,
-    default: 0,
-  })
+  @ApiProperty()
+  @Column({ name: 'amount_paid', type: 'decimal', precision: 12, scale: 2, default: 0 })
   amountPaid!: number;
 
-  @ApiProperty({ description: 'Outstanding balance' })
-  @Column({
-    name: 'balance',
-    type: 'decimal',
-    precision: 12,
-    scale: 2,
-    default: 0,
-  })
+  @ApiProperty()
+  @Column({ name: 'balance', type: 'decimal', precision: 12, scale: 2, default: 0 })
   balance!: number;
 
   @ApiProperty({ enum: PaymentStatus })
@@ -80,9 +76,15 @@ export class FeeInvoice {
   })
   paymentStatus!: PaymentStatus;
 
-  @ApiPropertyOptional({ description: 'Line items (e.g. Tuition, Uniform, Learning Kits)' })
+  @ApiPropertyOptional()
   @Column({ name: 'line_items', type: 'jsonb', nullable: true })
   lineItems?: Array<{ label: string; amount: number }>;
+
+  @ApiPropertyOptional({
+    description: 'Token used to access the public payment portal — no login required',
+  })
+  @Column({ name: 'portal_token', nullable: true, unique: true })
+  portalToken?: string;
 
   @ApiProperty()
   @CreateDateColumn({ name: 'created_at' })

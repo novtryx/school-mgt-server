@@ -1,30 +1,58 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
 import { Report } from '../reports/entities/report.entity';
+
+const ZEPTO_API = 'https://api.zeptomail.com/v1.1/email';
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
-  private readonly transporter: nodemailer.Transporter;
-  private readonly appUrl: string;
+  private readonly appUrl:     string;
+  private readonly zeptoToken: string;
+  private readonly zeptoFrom:  string;
 
-  
   constructor(private readonly configService: ConfigService) {
+    this.appUrl     = this.configService.get<string>('APP_URL',     'http://localhost:3000');
+    this.zeptoToken = this.configService.get<string>('ZEPTO_TOKEN', '');
+    this.zeptoFrom  = this.configService.get<string>('ZEPTO_FROM',  'info@novtryx.com');
+  }
 
-   
+  private async send(options: {
+    to:      string;
+    name?:   string;
+    subject: string;
+    html:    string;
+  }): Promise<void> {
+    try {
+      const res = await fetch(ZEPTO_API, {
+        method:  'POST',
+        headers: {
+          'Accept':        'application/json',
+          'Content-Type':  'application/json',
+          'Authorization': this.zeptoToken,
+        },
+        body: JSON.stringify({
+          from: { address: this.zeptoFrom, name: 'ReportRun' },
+          to: [{
+            email_address: {
+              address: options.to,
+              name:    options.name ?? options.to,
+            },
+          }],
+          subject:  options.subject,
+          htmlbody: options.html,
+        }),
+      });
 
-    this.transporter = nodemailer.createTransport({
-      host: this.configService.get<string>('MAIL_HOST'),
-      port: this.configService.get<number>('MAIL_PORT'),
-      secure: false,
-      auth: {
-        user: this.configService.get<string>('MAIL_USER'),
-        pass: this.configService.get<string>('MAIL_PASS'),
-      },
-    });
-
-    this.appUrl = this.configService.get<string>('APP_URL', 'http://localhost:3000');
+      if (!res.ok) {
+        const err = await res.text();
+        this.logger.error(`ZeptoMail error sending to ${options.to}: ${err}`);
+      } else {
+        this.logger.log(`Email sent to ${options.to} — "${options.subject}"`);
+      }
+    } catch (err) {
+      this.logger.error(`Failed to send email to ${options.to}: ${String(err)}`);
+    }
   }
 
   /**
@@ -119,11 +147,22 @@ export class NotificationsService {
     balanceDue: number,
     termLabel: string,
     customTemplate?: string | null,
+    portalUrl?: string,
   ): Promise<void> {
     const formattedBalance = new Intl.NumberFormat('en-NG', {
       style: 'currency',
       currency: 'NGN',
     }).format(balanceDue);
+
+    const paymentButton = portalUrl
+      ? `<p style="margin-top:16px;">
+           <a href="${portalUrl}"
+              style="display:inline-block;padding:12px 24px;background:#1a3a5c;color:#fff;text-decoration:none;border-radius:4px;font-weight:bold;">
+             View Statement &amp; Pay Online
+           </a>
+         </p>
+         <p style="font-size:12px;color:#666;">Or visit the bursar's office to pay in cash or by bank transfer.</p>`
+      : '<p>Please visit the bursar\'s office to make a payment at your earliest convenience.</p>';
 
     const defaultBody = `
       <p>Dear ${parentName},</p>
@@ -133,7 +172,7 @@ export class NotificationsService {
         <strong>${studentFirstName}'s</strong> account for the
         <strong>${termLabel}</strong> term.
       </p>
-      <p>Please log in to the school portal to make a payment at your earliest convenience.</p>
+      ${paymentButton}
       <p>Thank you.</p>
     `;
 
@@ -253,21 +292,4 @@ export class NotificationsService {
     });
   }
 
-  /**
-   * Internal send helper — logs errors without throwing so callers are not blocked.
-   */
-  private async send(options: {
-    to: string;
-    subject: string;
-    html: string;
-  }): Promise<void> {
-    try {
-      await this.transporter.sendMail({
-        from: this.configService.get<string>('MAIL_FROM'),
-        ...options,
-      });
-    } catch (err) {
-      this.logger.error(`Failed to send email to ${options.to}: ${String(err)}`);
-    }
-  }
 }

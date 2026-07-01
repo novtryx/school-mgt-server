@@ -115,7 +115,7 @@ export class SubscriptionsService {
     }
 
     const school = await this.schoolsService.findById(dto.schoolId);
-
+ 
     const reference = `SUB-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
     const appUrl = this.configService.get<string>('APP_URL', 'http://localhost:3000');
     const callbackUrl = `${appUrl}/api/v1/subscriptions/paystack/callback`;

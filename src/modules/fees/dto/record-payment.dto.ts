@@ -1,36 +1,38 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
+import { PaymentMethod } from '../entities/payment.entity';
 
 export class RecordPaymentDto {
-  @ApiProperty({ description: 'Invoice UUID' })
-  @IsUUID()
+  @ApiProperty({ description: 'Invoice ID to record payment against' })
+  @IsString()
   invoiceId!: string;
 
-  @ApiProperty({
-    description: 'Percentage of total amount to pay (1–100)',
-    example: 40,
-  })
+  @ApiProperty({ description: 'Actual amount being paid in school currency', example: 50000 })
   @IsNumber()
   @Min(1)
-  @Max(100)
-  percentageToPay!: number;
+  amount!: number;
 
-  @ApiPropertyOptional({ example: 'cash', description: 'cash | bank_transfer | pos | cheque' })
-  @IsOptional()
-  @IsString()
-  paymentMethod?: string;
+  @ApiProperty({ enum: PaymentMethod, default: PaymentMethod.CASH })
+  @IsEnum(PaymentMethod)
+  paymentMethod!: PaymentMethod;
 
-  @ApiPropertyOptional({ description: 'Bank teller number, POS receipt ID, etc.' })
+  @ApiPropertyOptional({ description: 'Teller number or bank reference' })
   @IsOptional()
   @IsString()
   reference?: string;
 
-  @ApiPropertyOptional({ description: 'Staff UUID of the bursar recording this payment' })
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsUUID()
+  @IsString()
   recordedBy?: string;
 
-  @ApiPropertyOptional({ description: 'Optional note to appear on the receipt' })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   note?: string;
